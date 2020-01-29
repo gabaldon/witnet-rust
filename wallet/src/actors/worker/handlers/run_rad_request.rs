@@ -19,6 +19,6 @@ impl Handler<RunRadRequest> for worker::Worker {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         log::debug!("Executing RAD request");
-        self.run_rad_request(request)
+        self.run_rad_request(request).map(|x|x.result)
     }
 }

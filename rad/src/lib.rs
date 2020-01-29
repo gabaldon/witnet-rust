@@ -69,11 +69,11 @@ pub async fn run_retrieval_report(retrieve: &RADRetrieve) -> Result<RadonReport<
                     message: x.description().to_string(),
                 })?;
 
-            if !response.status().is_success() {
-                return Err(RadError::HttpStatus {
-                    status_code: response.status().into(),
-                });
-            }
+            //if !response.status().is_success() {
+            //    return Err(RadError::HttpStatus {
+            //        status_code: response.status().into(),
+            //    });
+            //}
 
             let response_string = response
                 // TODO: replace with .body_bytes() and let RADON handle the encoding?
