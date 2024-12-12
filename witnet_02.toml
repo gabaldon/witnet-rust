@@ -1,0 +1,83 @@
+# You can read more about all the configuration params in
+# https://docs.witnet.io/configuration/toml-file/
+environment = "development"
+
+# Setting the environment to testnet allows us to define some consensus constants 
+[consensus_constants]
+# Set the bootstrap time to Thu Nov 21 2024 20:00:00 UTC 
+checkpoint_zero_timestamp = 1734021788
+checkpoint_period = 5
+
+# Genesis block hash
+genesis_hash = "324294b8e2f6a97bb7e608dbeab73ae63b4aaccf4e45ac9340520ca3862aefda"
+# Fix the bootstrap committee
+bootstrapping_committee = ["twit1ws0c7pud97jf4ykm0nfg9eam29u2prz4e3rwh8", "twit18a4qt7g37pe86m5fwtcr9q0u54azmsg3t75ayk"]
+# Make sure we can properly mine the first couple of block
+minimum_difficulty = 0
+epochs_with_minimum_difficulty = 1024
+
+[protocol]
+v1_7 = [0, 5]
+v1_8 = [1, 5]
+v2_0 = [25, 20]
+
+[connections]
+server_addr = "0.0.0.0:21338"
+known_peers = ["127.0.0.1:21337", "127.0.0.1:21338"]
+inbound_limit = 128
+outbound_limit = 1
+bootstrap_peers_period_seconds = 1
+handshake_max_ts_diff = 0
+consensus_c = 70
+reject_sybil_inbounds = false
+bucketing_ice_period_seconds = 300
+
+[storage]
+db_path = ".witnet-rust-testnet-stake_02"
+master_key_import_path = "zutano.txt"
+
+[jsonrpc]
+enabled = true
+enable_sensitive_methods = true
+# The addresses (IP and port) which the JSON-RPC server binds to.
+# WARNING: these should be kept to a local, private address (e.g. 127.0.0.1) to prevent any device in your local network
+# (and potentially, the internet) from messing with your JSON-RPC server.
+# JSON-RPC over plain TCP (required for CLI usage). Set `enabled` above to `false` to disable.
+tcp_address = "127.0.0.1:1235"
+# JSON-RPC over HTTP. Remove the line to disable it.
+http_address = "127.0.0.1:1222"
+# JSON-RPC over WebSockets. Remove the line to disable it.
+ws_address = "127.0.0.1:1223"
+
+[mining]
+# Enable or disable mining and participation in resolving data requests.
+enabled = true
+# Limit the number of retrievals that the node will perform during a single epoch. Due to the locking, highly
+# side-effected nature of performing HTTP GET requests, a limit needs to be enforced on the number of retrievals that
+# we are willing to perform by unit of time.
+# Raising this limit too high may make the node unresponsive to time-critical events, which could potentially lead to
+# desynchronization, forking or slashing.
+# This is assumed to be a safe default and it should never cause any node to refrain from participating in data requests
+# for which it was eligible.
+data_request_max_retrievals_per_epoch = 30
+# Limit the number of milliseconds that the node is willing to wait for a data source in from data request to response.
+data_request_timeout_milliseconds = 2000
+# Path for the `genesis_block.json` file that contains the initial wit allocations that need to be built into the first
+# block in the block chain.
+genesis_path = "./empty_gen.json"
+# `mint_external_address` and `mint_external_percentage` enable splitting the mint reward between the node's
+# own address and an "external" address, e.g. a the address of a wallet. `mint_external_percentage` indicates
+# the percentage of the block rewards that will be assigned to `mint_external_address` (50% by default)
+#mint_external_address = "twit18a4qt7g37pe86m5fwtcr9q0u54azmsg3t75ayk"
+#mint_external_percentage = 50
+# Set a minimum fee you require before your node includes a value transfer transaction into a block
+minimum_vtt_fee_nanowits = 1
+
+[ntp]
+enabled = false
+
+[log]
+level = "debug"
+
+[tapi]
+oppose_wip0016 = true
