@@ -17,8 +17,7 @@ use witnet_crypto::{
 };
 use witnet_data_structures::{
     chain::{
-        CheckpointBeacon, DataRequestOutput, Environment, Epoch, EpochConstants, Hash, Hashable,
-        Input, KeyedSignature, OutputPointer, PublicKeyHash, ValueTransferOutput,
+        CheckpointBeacon, DataRequestOutput, Environment, Epoch, EpochConstants, Hash, Hashable, Input, KeyedSignature, OutputPointer, PublicKeyHash, StakeOutput, ValueTransferOutput
     }, fee::{AbsoluteFee, Fee}, get_environment, proto::versioning::{ProtocolInfo, VersionedHashable}, radon_error::RadonError, transaction::{
         DRTransaction, DRTransactionBody, TallyTransaction, Transaction, VTTransaction,
         VTTransactionBody,
@@ -665,7 +664,8 @@ where
                 }
             }
         }
-
+        println!("TOTAL TRANSACTION ...... {:?}", total);
+        println!("TRANSACTIONS ...... {:?}", transactions);
         Ok(model::WalletTransactions {
             transactions,
             total,
@@ -785,6 +785,8 @@ where
                 Transaction::Commit(ref commit) => (&commit.body.collateral, &commit.body.outputs),
                 Transaction::Tally(ref tally) => (&[], &tally.outputs),
                 Transaction::Mint(ref mint) => (&[], &mint.outputs),
+                Transaction::Stake(ref st) => (&st.body.inputs, &st.body.change.clone().into_iter().collect::<Vec<_>>()),
+                Transaction::Unstake(ref unstake) => (&[], &[unstake.body.withdrawal.clone()]),
                 _ => continue,
             };
 
@@ -1429,7 +1431,8 @@ where
         // creators. By protocol the tally output can only be set to the first used input of the DR.
         // - Commit and Reveal transactions are ignored as they only contain miners addresses.
         match txn.transaction {
-            Transaction::ValueTransfer(_) | Transaction::Mint(_) => {
+            // TODO: add stake an unstake txs
+            Transaction::ValueTransfer(_) | Transaction::Mint(_) | Transaction::Stake(_) | Transaction::Unstake(_) => {
                 for (output_pointer, key_balance) in account_mutation.utxo_inserts {
                     // Retrieve previous address information
                     let old_address = match addresses.entry(key_balance.pkh) {
@@ -1580,6 +1583,8 @@ where
                 Transaction::Commit(commit) => commit.body.outputs,
                 Transaction::Tally(tally) => tally.outputs,
                 Transaction::Mint(mint) => mint.outputs,
+                Transaction::Stake(stake) => stake.body.change.into_iter().collect(),
+                Transaction::Unstake(unstake) => Vec::from([unstake.body.withdrawal]),
                 _ => vec![],
             })
             .collect_vec();
@@ -1663,6 +1668,7 @@ where
         let mut utxo_removals: Vec<model::OutPtr> = vec![];
         let mut utxo_inserts: Vec<(model::OutPtr, model::OutputInfo)> = vec![];
         let mut resolved_inputs: Vec<ValueTransferOutput> = vec![];
+        //TODO: get change
 
         let mut input_amount: u64 = 0;
         for input in inputs.iter() {
@@ -1758,6 +1764,7 @@ where
                     0u64
                 } else {
                     let total_output_amount = outputs.iter().fold(0, |acc, x| acc + x.value);
+                    //TODO: in case of stake transaction minus change
 
                     total_input_amount
                         .checked_sub(total_output_amount)
@@ -2073,6 +2080,8 @@ fn extract_inputs_and_outputs(
         }
         Transaction::Tally(tally) => (vec![], tally.outputs.clone()),
         Transaction::Mint(mint) => (vec![], mint.outputs.clone()),
+        Transaction::Stake(stake) => (stake.body.inputs.clone(), stake.body.change.clone().into_iter().collect(),),
+        Transaction::Unstake(unstake) => (vec![], vec![unstake.body.withdrawal.clone()]),
         _ => {
             return Err(Error::UnsupportedTransactionType(format!(
                 "{:?}",
@@ -2110,6 +2119,8 @@ fn build_balance_movement(
         _ => vec![],
     };
 
+    println!("Transaction ->: {:?}", &txn.transaction);
+
     // Transaction Data
     let transaction_data = match &txn.transaction {
         Transaction::ValueTransfer(vtt) => model::TransactionData::ValueTransfer(model::VtData {
@@ -2132,6 +2143,14 @@ fn build_balance_movement(
             request_transaction_hash: tally.dr_pointer.to_string(),
             outputs: vtt_to_outputs(&tally.outputs, &own_outputs),
             tally: build_tally_report(tally, &txn.metadata)?,
+        }),
+        Transaction::Stake(stake) => model::TransactionData::Stake(model::StakeData {
+            inputs: transaction_inputs,
+            // TODO: should the stake output value be in txn.metadata?
+            change: stake.body.change.as_ref().map(|change| vto_to_output(change, &own_outputs)),
+        }),
+        Transaction::Unstake(unstake) => model::TransactionData::Unstake(model::UnstakeData {
+            withdrawal: vto_to_output(&unstake.body.withdrawal, &own_outputs)
         }),
         _ => {
             return Err(Error::UnsupportedTransactionType(format!(
@@ -2307,6 +2326,21 @@ fn vtt_to_outputs(
                 .unwrap_or(&model::OutputType::Other),
         })
         .collect::<Vec<model::Output>>()
+}
+
+// Map vto to output 
+fn vto_to_output(
+    vto: &ValueTransferOutput,
+    own_outputs: &HashMap<PublicKeyHash, model::OutputType>,
+) -> model::Output {
+         model::Output {
+            address: vto.pkh.to_string(),
+            time_lock: vto.time_lock,
+            value: vto.value,
+            output_type: *own_outputs
+                .get(&vto.pkh)
+                .unwrap_or(&model::OutputType::Other),
+        }
 }
 
 #[inline]
